@@ -1,0 +1,802 @@
+---
+title: "PSTAT 230 Qualifying Exam Takehome"
+author: Benjamin Vaughan
+output: pdf_document
+---
+#Introduction
+
+In this report we will discuss the answer to a few questions to the dataset created in a study done by a psychologist using 140 UCSB students. This experiment involved payoffs in selecting between war and peace between a subject and that subject's partner in the study. Each combination of selection of war and peace by both parties had unique payoffs for each subject in the pair. Data was recorded on each subject's selection of war or peace, each subject's partner's selection, each subject's belief in what their partner chose, each subject's belief in what that subject thinks their partner thinks they chose, whether or not each subject and their partner agreed to peace, each subject's feeling of guilt before revealing their partner's choice, and each subject's feeling of guilt after revelation. The relevant questions being asked based on this dataset were:
+
+1. Does mutual agreement of peace increase the chance of actual selection of peace?
+
+2. We say that a participant has peace beliefs if she/he believes that her/his matched subject has selected peace and that her/his matched subject believes she/he has selected peace. Does peace beliefs increase the chance of actual selection of peace?
+
+3. How do both facotsr, mutual agreement and beliefs, affect the chance of actual selection of peace? Which factor is a more important predictor for peace, mutual agreement or beliefs?
+
+4. Does the selection of war lead to guilt feelings? Does this feeling depend on mutual agreement and the selection of matching pair? Conduct separate analysis for guilt feelings before and after revelation.
+
+To answer these questions, two-way table $\chi^2$ tests and multinomial sampling surrogate Poisson models were used.
+
+#Analysis
+```{r, echo=FALSE, results='asis', warning=F, message=F}
+
+warpeace <- read.table(
+  "/Users/bvaughan29/Dropbox/PSTAT 230/QUALIFYING EXAM TAKE HOME/warpeace.txt",header=T)
+
+library(ggplot2)
+library(stargazer)
+
+```
+
+##Quesiton 1: Does mutual agreement of peace increase the chance of actual selection of peace?
+
+This question implies a causal relationship, not just a correlation. The fact that the experiment was randomized makes these causal conclusions possible because the chance mechanism insures treament difference are not due to features of the students that took part in the experiment. 
+
+The question is asking if mutual agreement of peace causes an increase in the chance of actual selection of peace campared to those who did not reach a mutual agreement of peace. For this, we can look at two groups, one group being where the pairs of students agreed on peace and the other group being where the pairs of students did not agree on peace (i.e. they mutually agree to war or one agrees to war and the other agrees to peace or they choose not to speak). Once we have the groups, we can look at the number of people in each group that chose peace and the number that chose war. To visualize this problem, we can look at a bar graph:
+
+```{r, echo=F}
+
+#agreed to peace
+peaceagree <- warpeace[which(warpeace$agree==1),]
+
+#did not agree to peace
+peaceagreec <- warpeace[which(warpeace$agree==0),]
+
+#side by side bar graphs
+counts <- table(warpeace$peace,
+                warpeace$agree)
+colnames(counts) <- c("did not agree to peace","agreed to peace")
+rownames(counts) <- c("did not choose peace","chose peace")
+barplot(counts, 
+        beside=T, 
+        col=c("orange","aquamarine"))
+legend("topleft",
+       legend=c("did not choose peace","chose peace"), 
+       fill=c("orange","aquamarine"))
+```
+
+It appears that there were many more people who agreed to peace than who did not agree to peace. It is also evident that a larger proportion of people who agreed to peace actually chose peace compared to the proportion who did not agree to peace and actually chose peace ($\frac{60}{102}$ or `r 60*100/102`% of people who agreed to peace chose peace whereas $\frac{10}{38}$ or `r 10*100/38`% of people who did not agree to peace chose peace). It would seem from this that mutual agreement of peace does increase the chance of actually choosing peace. However, we need a structure to formally test that these counts are significantly different.
+
+Because we have two factors, one being the agreement of peace with levels 1 (agreed to peace) and 0 (did not agree to peace) and the second being the choice of peace with levels 1 (chose peace) and 0 (did not choose peace), we can construct a two-way table design, as follows, to model the data. Using this structure, we can conduct a test of independence to determine if there is an association between these two factors. We need to do this test because if there is no significant association, then it would be inappropriate to make any conclusions about whether or not agreeing to peace increases the chance of choosing peace. 
+
+```{r, echo=F}
+
+library(knitr)
+
+#create table for output
+kable(counts,align="c")
+
+```
+
+For the test of independence, our null hypothesis is that there is no association between agreeing to peace and choosing peace (i.e. agreeing to peace does not affect the chance of choosing peace) and our alternative hypothesis would be that there is an association between the two (i.e. agreeing to peace does affect the chance of choosing peace). To conduct this test, we first need to find the expected counts for each of the cells in the table above. We find these expected counts by multiplying each cell's corresponding row sum by its corresponding column sum and then dividing by the total sum of counts. When we do so, we get the following table of expected counts.
+
+```{r, echo=F}
+
+expcnt <- as.table(matrix(c(70*38/140,38*70/140,102*70/140,102*70/140),nrow=2,ncol=2))
+
+colnames(expcnt) <- c("did not agree to peace","agreed to peace")
+rownames(expcnt) <- c("did not choose peace","chose peace")
+
+kable(expcnt,align="c")
+
+```
+
+Now that we have our observed counts and expected counts, we can define and calculate our test statistic as:
+
+$$X^2=\sum \frac{(\mathbf{observed}-\mathbf{expected})^2}{\mathbf{expected}}=\frac{(28-19)^2}{19}+\frac{(10-19)^2}{19}+\frac{(42-51)^2}{51}+\frac{(60-51)^2}{51} = 11.70279 $$ 
+```{r,echo=F}
+#test statistic
+test.stat1 <- (((28-19)^2)/19) + (((10-19)^2)/19) + (((42-51)^2)/51) + (((60-51)^2)/51)
+
+#p-value
+p.val1 <- 1 - pchisq(test.stat1,df=1)
+```
+
+Under the null hypothesis, $X^2 \mathrel{\dot\sim} \chi^2_{(I-1)(J-1)}$ where $I$ is the number of levels of the factor "agreement of peace" and $J$ is the number of levels of the factor "chose peace". Both $I,J=2$ in this case, so $X^2 \mathrel{\dot\sim} \chi^2_{1}$ under the null hypothesis. The p-value for this test statistic is therefore $p=$ $`r p.val1`$. Because $p < \alpha=0.05$ we reject the null hypothesis. This means that there is enough evidence in the data to indicate an association between agreeing to peace and choosing peace. So, going back to the original question, because our test shows that there is evidence of an association between agreeing on peace and choosing peace, we can comment, based on our findings in the bar plot, that agreement to peace does significantly increase the chance of actually choosing peace.
+
+We can also use another structure to test this hypothesis known as a surrogate Poisson model. In the case of the surrogate Poisson, the total count of responses is fixed, which it is in this case because we are told that 140 students partook in the experiment. In other words, the counts in each cell are dependent (i.e. if a person agreed to peace, this means that one fewer observation can go into the "did not agree to peace" category). This indicates that the counts in our observed data table follow a multinomial sampling scheme, for which we use the surrogate Poisson model. For this type of model, we are interested in treating the count in each cell as the dependent variable and the two factors as the independent variables. It is also necessary to label each of the independent variables as either stimulus or response factors. Based on the question above, we are trying to see if agreement to peace stimulates the choice of peace. Therefore, "agreement to peace" would be our stimulus factor and "choosing peace" is our response factor. 
+
+To start, we need to create what we call a minimal model. The minimal model is a saturated model for all stimulus variables plus the main effect of the response variable. This model is typically of no interest because it does not include terms that involve the interaction between the response and stimulus factors, which are what we are mainly interested in. In this scenario, we only have one stimulus variable, so our minimal model would take the following form (for simplicity, I will call "chose peace" simply "peace" and "agreed to peace" simply "agree"):
+
+$$\ln (n_{ij})=\mu + \mathbf{peace}_i + \mathbf{agree}_j$$
+
+Here, $n_{ij}$ are the counts in row $i$ of factor "peace" and column $j$ of factor "agree", $\mathbf{peace}_i$ is the dummy variable for the main effect of choosing peace (i.e. the expected change in the log of the count in a cell where a person chose peace as opposed to if they did not choose peace), $\mathbf{agree}_j$ is the dummy variable for the main effect of agreeing to peace (i.e. the expected change in the log of the count in a cell where a person agreed to peace as opposed to if they did not agree to peace), and $\mu$ is the baseline expected count (i.e. the expected log of the count in the cell where a person both did not agreed to peace and did not choose peace). From here, we would like to create the full model, which includes the interaction between "peace" and "agree" and which will allow us to test for the significance of the interaction between the two factors. The full model takes the following form:
+
+$$\ln (n_{ij})=\mu + \mathbf{peace}_i + \mathbf{agree}_j + (\mathbf{peace} \times \mathbf{agree})_{ij}$$
+
+This model has all of the same elements as the minimal model, but adds the interaction term between the response and stimulus factors to test their independence. This term measures how much we expect the log of the counts to change between [both agreeing to peace and choosing peace] and [both not agreeing to peace and not choosing peace] (i.e. the expected difference in the log of the diagonal counts). After fitting this model, we get the following coefficients and p-values:
+
+```{r, echo=FALSE, results='asis', warning=F, message=F}
+
+peaceagree.sp <- cbind(expand.grid(agree=c("no","yes"),peace=c("no","yes")),ct=c(28,42,10,60))
+
+surpois1 <- glm(ct ~ peace*agree, family=poisson, data=peaceagree.sp)
+
+int.p1 <- summary(surpois1)$coefficients[4,4] 
+
+library(stargazer)
+stargazer(surpois1,
+          header=FALSE, 
+          title="Surrogate Poisson Model (Agree to Peace vs. Choose Peace", 
+          dep.var.labels="Counts",
+          covariate.labels=c("peace","agree","peace*agree","Intercept"),
+          report="vcp*")
+
+```
+
+We require that all terms from the minimal model remain in the full model when checking for the significance of the interaction term in the full model; therefore, we are only looking at the p-value for the interaction term in the summary of the full model. Here, the interaction term has a p-value of $p=$ $`r int.p1`$ $< \alpha=0.05$, so it is highly significant. This coincides with our findings from the previous two-way table structure and hypothesis test, meaning we can come to the same conclusion, that agreement to peace does increase the chance of actually choosing peace. 
+
+Because the original exploratory data analysis and both the two-way table hypothesis test and multinomial sampling surrogate Poisson model indicate the same trend, my answer to this question would be that agreeing to peace does in fact cause an increase in the chance of choosing peace.
+
+##Question 2: We say that a participant has peace beliefs if she/he believes that her/his matched subject has selected peace and that her/his matched subject believes she/he has selected peace. Does peace beliefs increase the chance of actual selection of peace?
+
+This question is similar to the previous question in that we are trying to determine if one factor, peace beliefs, increases the chance of one of the outcomes of another factor, actually choosing peace. Because of this, we can conduct much the same analysis. However, first we need to be clear on the definition of "peace beliefs". Peace beliefs is when a subject believes that the subject's partner will choose peace *and also* believes that the subject's *partner believes* that the subject chose peace. In terms of the original data, subjects with peace beliefs are the observations where `belief1 = 1` *and* `belief2 = 1` (i.e. both conditions must be met for the same subject for that subject to have peace beliefs).
+
+Because this question is nearly identical in structure to the previous question, I will start the same way, with a bar graph (Plot 1 in the Appendix). We are looking at two groups, those with peace beliefs and those with, what I will call, non-peace beliefs, and seeing which group has a larger proportion of people who actually chose peace.
+
+```{r, echo=F}
+
+#peace beliefs
+peaceful <- vector()
+for(i in 1:nrow(warpeace)){
+  if(warpeace$belief1[i]==1 && warpeace$belief2[i]==1){
+    peaceful <- c(peaceful,1)
+  }
+  else{
+    peaceful <- c(peaceful,0)
+  }
+}
+
+warpeace2 <- cbind(warpeace,peaceful)
+
+```
+
+This plot is very similar to the plot from the previous question. As, perhaps, we would expect, the proportion of people that chose peace out of those who have peace beliefs is larger than the proportion of people that chose peace out of those who have non-peace beliefs ($\frac{57}{81}$ or `r 57*100/81`% of people who have peace beliefs chose peace whereas $\frac{13}{59}$ or `r 13*100/59`% of people who have non-peace beliefs chose peace).
+
+Again, to more formally test this, we can also conduct the two-way table hypothesis test of independence. We have the following frequency table:
+
+```{r,echo=F}
+
+counts2 <- table(warpeace2$peace,
+                warpeace2$peaceful)
+colnames(counts2) <- c("non-peace beliefs","peace beliefs")
+rownames(counts2) <- c("did not choose peace","chose peace")
+
+kable(counts2,align="c")
+
+expcnt2 <- as.table(matrix(c((46+24)*(46+13)/140,(46+13)*(13+57)/140,(46+24)*(24+57)/140,(13+57)*(24+57)/140),nrow=2,ncol=2))
+
+colnames(expcnt2) <- c("non-peace beliefs","peace beliefs")
+rownames(expcnt2) <- c("did not choose peace","chose peace")
+
+#test statistic
+test.stat2 <- (((46-29.5)^2)/29.5) + (((13-29.5)^2)/29.5) + (((24-40.5)^2)/40.5) + (((57-40.5)^2)/40.5)
+
+#p-value
+p.val2 <- 1 - pchisq(test.stat2,df=1)
+
+```
+
+The table of expected counts (Table 1) and test statistic calculation (Equation 1) have been added to the appendix. Our test statistic comes out to $X^2=$ $`r test.stat2`$ and has a p-value of $p=$ $`r p.val2`$. Our p-value here is much smaller than $\alpha = 0.05$, meaning our result is highly significant. We would reject the null hypothesis and conclude that the data contain sufficient evidence to indicate an association between whether or not a person has peace beliefs and whether or not they chose peace. From this, we can say that based on our previous findings in the bar plot, having peace beliefs does significantly increase the chances of choosing peace.
+
+We can, of course, also fit another surrogate Poisson model. In this scenario, peace beliefs would be the stimulus factor and choosing peace remains our response factor. The minimal model can be found in the appendix (Equation 2), but our full model can be written as follows (for simplicty, I will call the factor "peace beliefs" simply "peaceful"):
+
+$$\ln (n_{ij})=\mu + \mathbf{peace}_i + \mathbf{peaceful}_j + (\mathbf{peace} \times \mathbf{peaceful})_{ij}$$
+
+The interpretations of the parts of this full model that are the same as the full model from the first question remain the same here. Also, $\mathbf{peaceful}_j$ is the dummy variable for the main effect of having peace beliefs (i.e. the expected change in the log of the count in a cell where a person has peace beliefs as opposed to if they have non-peace beliefs) and $(\mathbf{peace} \times \mathbf{peaceful})_{ij}$ measures how much we expect the log of the counts to change between [both having peace beliefs and choosing peace] and [both having non-peace beliefs and not choosing peace] (i.e. the expected difference in the log of the diagonal counts). 
+
+```{r, echo=FALSE, results='asis', warning=F, message=F}
+
+mydata2 <- cbind(expand.grid(peaceful=c("no","yes"),peace=c("no","yes")),ct=c(46,24,13,57))
+
+surpois2 <- glm(ct ~ peace*peaceful, family=poisson, data=mydata2)
+
+int.p2 <- summary(surpois2)$coefficients[4,4] 
+
+
+```
+
+The coefficients and p-values for this model can be found in the appendix (Table 2). The p-value for the interaction term comes out to $p=$ $`r int.p2`$ which is highly significant, so we reach the same conclusion as we did in the two-way table setup: there is sufficient evidence to indicate an interaction between having peace beliefs and choosing peace.
+
+Again, the two-way table and the multinomial sampling surrogate Poisson model have come to the same conclusion, so based on the findings from the original bar graph as well, my answer to this second question would be that having peace beliefs does increase the chance of actually choosing peace.
+
+##Question 3: How do both factors, mutual agreement and beliefs, affect the chance of actual selection of peace? Which factor is a more important predictor for peace, mutual agreement or beliefs?
+
+In a way, this question is asking us to combine information from the first two questions. We now want to know how a combination of factors, agreeing to peace and peace beliefs, affects a single factor, choosing peace. This problem has a similar structure to the previous two questions, but instead of a two-way table, we now have a three-way table that can be represented as follows: 
+
+```{r, echo=FALSE, results='asis', warning=F, message=F}
+
+library(plyr)
+counts3 <- count(df=warpeace2, vars=c('agree','peaceful','peace'))
+
+kable(counts3,col.names=c("agreed to peace","has peace beliefs","chose peace","counts"),align="c")
+
+```
+
+This is a bit different from how previous tables were represented, but it is essentially the same. Each row can be thought of as a cell. The first row would correspond to the cell where "agreed to peace" is at level 0 (i.e. did not agree to peace), "has peace beliefs" is at level 0 (i.e. has non-peace beliefs), and "chose peace" is at level 0 (i.e. did not choose peace) and the counts column gives the counts in each corresponding cell. Here, level 0 corresponds to *not* being descriped by the column trait and level 1 corresponds to being descriped by the column trait. One way to visualize this data is with the following plot:
+
+```{r, echo=F, warning=F}
+
+x <- cbind(expand.grid(peaceful=c(0,1),agree=c(0,1)),p=c(600/(23+6),400/(5+4),700/(23+7),5300/(53+19)))
+
+symbols(x[,2],x[,3],
+        circles=c(29,9,30,72)/140,
+        xlim=c(-0.8,1.8),
+        ylim=c(5,90),
+        xlab="agreed to peace",
+        ylab="percent that chose peace",
+        main="Percent that chose peace given agreed to peace and peace beliefs",
+        inches=F,
+        axes=F)
+
+box()
+axis(2,cex=0.7)
+axis(1,at=c(0,1),label=c("no","yes"),cex=0.7)
+points(x[x[,1]==0,2],x[x[,1]==0,3],pch="no")
+points(x[x[,1]==1,2],x[x[,1]==1,3],pch="yes")
+lines(c(0,1),100*c(10/38,60/102),lty=2,pch="M",type="b")
+
+```
+
+In this plot, the size of the circle is proportional to the counts in that category. The "y"s and "n"s inside the plot correspond to the levels of peace beliefs. The "M"s inside the plot correspond to the average percentages over the levels of peace belief. From this plot, we can get a sense of the interactions between the variables by looking at different combinations of points. As we did before, we'd like to see if these interactions are significant.
+
+The two-way table hypothesis test will no longer work with this data because we now have a three-way table. However, the surrogate Poisson model is still flexible enough to model the three-way table structure. We, again, start building the model by first defining the stimulus and response factors. Here, we are interested in how the combination of factors "agreeing to peace" and "peace beliefs" stimulate the factor "choosing peace", therefore our stimulus factors are "agreeing to peace" and "peace beliefs" and our response factor is "choosing peace". Now we need to define the minimal model, which includes the main effects of each stimulus variable and the response variable and also all interactions between stimulus variables, so the minimal model takes the following form:
+
+$$\ln (n_{ijk})=\mu + \mathbf{agree}_i + \mathbf{peaceful}_j + (\mathbf{agree} \times \mathbf{peaceful})_{ij} + \mathbf{peace}_k$$
+
+We continue by defining the full model. The full model contains all main effects and interactions of all factors. The full model takes the form:
+
+$$
+\begin{aligned}
+\ln (n_{ijk}) = & \mu + \mathbf{agree}_i + \mathbf{peaceful}_j + (\mathbf{agree} \times \mathbf{peaceful})_{ij} + \mathbf{peace}_k \\
+&+ (\mathbf{agree} \times \mathbf{peace})_{ik} + (\mathbf{peaceful} \times \mathbf{peace})_{jk} + (\mathbf{agree} \times \mathbf{peaceful} \times \mathbf{peace})_{ijk}
+\end{aligned}
+$$
+
+The top line here is all the terms in the minimal model and the bottom line is the addition of all of the interaction terms between the stimulus factors and the response factors. These new interaction terms are what we are interested in, so we will look at their p-values. The summary table for this model can be found in the appendix (Table 3).
+
+```{r, echo=FALSE, results='asis', warning=F, message=F}
+
+mydata3 <- cbind(expand.grid(peace=c("no","yes"),
+                             peaceful=c("no","yes"),
+                             agree=c("no","yes")),
+                 ct=c(23,6,5,4,23,7,19,53))
+
+surpois3 <- glm(ct ~ peace*peaceful+peace*agree+peace*peaceful*agree, 
+                data=mydata3, 
+                family=poisson)
+
+```
+
+Again, we require that we keep all terms from the minimal model, so looking at the p-values of those terms that we have added to the minimal model to create the full model, we see that actually none of the terms we added are significant, meaning it would be best to remove at least one of them from the model. I will use the AIC criteria and stepwise regression in both directions to see which terms should be removed. The AIC is a measure of the quality of the model, offering an estimate of the amount of information lost when using that model. Therefore, we will be looking for the AIC value to decrease when removing a term in each step of stepwise regression in both directions because less information lost is desirable. Stepwise regression in both directions is a variable selection method where terms are both removed and added in each step to find the model that gives the optimal cirteria, which would be the smallest AIC value in this case. Performing this operation gives us the following best model:
+
+```{r,echo=FALSE}
+
+surpois3.2 <- step(surpois3, data=mydata3, scale=1, trace=F, 
+                   scope=list(lower=ct~peaceful*agree+peace,
+                              upper=formula(surpois3)))
+
+```
+
+$$
+\begin{aligned}
+\ln (n_{ijk}) = & \mu + \mathbf{agree}_i + \mathbf{peaceful}_j + (\mathbf{agree} \times \mathbf{peaceful})_{ij} + \mathbf{peace}_k \\
+&+ (\mathbf{peaceful} \times \mathbf{peace})_{jk}
+\end{aligned}
+$$
+
+We see that the only term remaining after variable selection that we added to the minimal model to create the full model is the interaction between peace beliefs and choosing peace (i.e. ($\mathbf{peaceful} \times \mathbf{peace})_{jk}$). Based on the summary of the model, which can be found in the appendix (Table 4), all terms are highly significant except for $\mathbf{agree}_i$ which is part of the minimal model, so we must keep it in the final model. 
+
+We can answer the questions posed in the original question statement using this model. The first question was how both factors, mutual agreement and beliefs, affect the chance of actual selection of peace. Variable selection caused us to throw out the three-way interaction between agree, peaceful, and peace, so we determined that this term did not add information to the model. This means that agreement to peace and peace beliefs do not interact together with  choosing peace, so together they do not affect the chance of actual selection of peace. In terms of our plot for this question, any grouping of two points (of the four points on the plot) is not different from the group of the other two points. In fact, we also threw out the interaction between agree and peace. This is interesting because in Question 1, we saw that this interaction was significant, however, when we add the "peaceful" factor and its interactions, "agree" no longer adds information to the model. I believe this answers the question of which factor is a more important predictor for choosing peace; it would be that peace beliefs is a more important predictor for choosing peace.
+
+##Question 4: Does the selection of war lead to guilt feelings? Does this feeling depend on mutual agreement and the selection of matching pair? Conduct separate analysis for guilt feelings before and after revelation.
+
+**The first question here is if the selection of war leads to guilt feelings before revelation.**
+
+In this question, choosing war is simply the complement of choosing peace, so we can continue to use the variable we have been calling "choose", but we are now interested in when `peace = 0` (i.e. the subject did not choose peace, they chose war). Guilt feelings is measured on an ordinal scale from 0 (i.e. not at all) to 6 (i.e. very intensely), so it is neither binary like the previous variables we've discussed, but it also does not follow a Normal or continuous distribution (i.e. we cannot fit an ANOVA model). We are also limited in our approach of analysis by the fact that the counts in the frequency table  are not independent of each other (i.e. we cannot created a generalized linear model using a binomial distribution and logit link). Also, treating guilt as a factor with seven levels leads to a relatively complex model with strange parameter interpretations that do not lead us to a desireable, simple solution to the question. Therefore, I believe that the best course of action would be to interpret "guilt feelings" as "any level of guilt greater than none at all". In doing this, we would combine the counts from levels 1 to 6 for variable "guiltb", thus making it a binary variable. It is important to note that this simplification will cause us to lose information, but for the interpretation of this problem and its results, I believe doing this makes sense. We can use the following table to summarize the data:
+
+```{r,echo=FALSE}
+
+guiltb.0 <- vector()
+
+for(i in 1:nrow(warpeace)){
+  if(warpeace$guiltb[i]==0){
+    guiltb.0 <- c(guiltb.0,0)
+  }
+  else{
+    guiltb.0 <- c(guiltb.0,1)
+  }
+}
+
+warpeace4 <- cbind(warpeace,guiltb.0)
+
+counts4 <- table(warpeace4$guiltb.0, warpeace4$peace)
+
+colnames(counts4) <- c("chose war","chose peace")
+
+rownames(counts4) <- c("no guilt feelings","guilt feelings")
+
+kable(counts4,align="c")
+
+```
+
+This table clearly indicates that few people felt very guilty before revelation. We can also look at the bar graph in the Appendix (Plot 2). This plot makes intuitive sense, as we can see that people who chose peace seemed to feel less guilty than those who chose war. We can test if this is true again with a $\chi^2$ test of independence.
+
+```{r, echo=FALSE}
+
+matrix4.1 <- matrix(c(28,42,63,7),nrow=2,ncol=2)
+
+colsums <- matrix(rep(colSums(matrix4.1),2),byrow=T,nrow=2,ncol=2)
+
+rowsums <- matrix(rep(rowSums(matrix4.1),2),nrow=2,ncol=2)
+
+expect4.1 <- colsums*rowsums/140
+
+test.stat4 <- sum((matrix4.1-expect4.1)^2/expect4.1)
+
+p.val4 <- 1 - pchisq(test.stat4,df=1)
+```
+
+Under the null hypothesis, the test statistic discussed earlier $X^2 \mathrel{\dot\sim} \chi^2_{(I-1)(J-1)}$ where $I$ is the number of levels of the factor "peace" and $J$ is the number of levels of the factor "guiltb". $I,J=2$ in this case, so $X^2 \mathrel{\dot\sim} \chi^2_{1}$ under the null hypothesis. Our test statistic comes out to $X^2=$ $`r test.stat4`$. Therefore, the p-value for this test statistic is $p=$ $`r p.val4`$. Because $p < \alpha=0.05$ we reject the null hypothesis. This means that there is enough evidence in the data to indicate an association between choosing peace and guilt feelings before revelation.
+
+We can also build the surrogate Poisson model and look at the coefficients in the model to determine the type of relationship between choosing peace and guilt feelings before revelation. Here, the stimulus variable would be "peace" and the response variable would be "guiltb". The minimal model has the following form:
+
+$$\ln(n_{ij}) = \mu + \mathbf{peace}_i +  \mathbf{guiltb}_j$$
+
+Here, $\mathbf{guiltb}_{j}$ is the dummy variable for the factor "guiltb". The full model takes the form:
+ 
+$$\ln(n_{ij}) = \mu + \mathbf{peace}_i + \mathbf{guiltb}_j + (\mathbf{peace} \times \mathbf{guiltb})_{ij}$$
+
+Here, we've simply added an interaction term between the factors "peace" and "guiltb" to the minimal model. If we build this model and look at its summary of coefficient and p-values, which can be found in the appendix (Table 5), we see that the interaction between "peace" and "guiltb" is highly significant, so we reach the same conclusion we did in the $\chi^2$ test of independence. Similar to our results in the previous questions, because we saw that far more people who chose peace did not feel guilty, we can say that choosing war actually does lead to feelings of guilt before revelation of the partner's choice of war or peace.
+
+```{r, echo=FALSE, results='asis', warning=F, message=F}
+
+mydata4 <- cbind(expand.grid(guiltb=c("no guilt","guilt"),
+                             peace=c("war","peace")),
+                  ct=c(28,42,63,7))
+
+surpois4 <- glm(ct ~ peace*guiltb, data=mydata4, family=poisson)
+
+```
+
+**The second question here is if the selection of war leads to guilt feelings after revelation.**
+
+If we conduct this same exact analysis, but use the `guilta` variable, which is the same measure of guilt as `guiltb` but is measured after revelation of the partner's choice of war or peace, instead of `guiltb`, we get the following frequency table and bar plot (Plot 3):
+
+```{r,echo=FALSE}
+
+guilta.0 <- vector()
+
+for(i in 1:nrow(warpeace)){
+  if(warpeace$guilta[i]==0){
+    guilta.0 <- c(guilta.0,0)
+  }
+  else{
+    guilta.0 <- c(guilta.0,1)
+  }
+}
+
+warpeace5 <- cbind(warpeace,guilta.0)
+
+counts5 <- table(warpeace5$guilta.0, warpeace5$peace)
+
+colnames(counts5) <- c("chose war","chose peace")
+
+rownames(counts5) <- c("no guilt feelings","guilt feelings")
+
+kable(counts5,align="c")
+
+```
+
+```{r, echo=FALSE}
+
+matrix5.1 <- matrix(c(35,35,66,4),nrow=2,ncol=2)
+
+colsums <- matrix(rep(colSums(matrix5.1),2),byrow=T,nrow=2,ncol=2)
+
+rowsums <- matrix(rep(rowSums(matrix5.1),2),nrow=2,ncol=2)
+
+expect5.1 <- colsums*rowsums/140
+
+test.stat5 <- sum((matrix5.1-expect5.1)^2/expect5.1)
+
+p.val5 <- 1 - pchisq(test.stat5,df=1)
+
+```
+
+We can see that, after revelation, an equal number of people felt some guilt and felt no guilt. This is a change from the majority feeling some guilt and is interesting because the question is asking if the selection of war leads to guilt feelings. From this plot, we might think that choosing war leads to an equal chance of feeling guilt or not feeling guilt. The $\chi^2$ test of independence will return a significant result if *at least one* of the counts in the frequency table is very different from its expected value (i.e. its value when the two variables are independent). If we conduct this test, we get a test statistic of $`r test.stat5`$ with $p=$ $`r p.val5`$. This result is likely due to the extreme values in the category "chose peace" which we aren't interested in. However, because the counts in the cells are dependent, we can say that each of these cells is significantly different from its expected value. The expected value for the cell that is at the intercection of "chose war" and "guilt feelings" is 19.5 while the observed value is 35. Because the observed value is greater than the expected value, we can say that choosing war does lead to guilt feelings.
+
+**The third question asks if guilt feelings before revelation depend on mutual agreement and the selection of the partner's choice. **
+
+For this question, I will continue to think of guilt feelings as a binary variable. When we do this, the analysis is similar to Question 3 above, where we are trying to determine the effect of two factors, mutual agreement and the partner's selection, on a single factor, guilt before revelation. We can start by looking at the frequency table and visualization of the data (Appendix Table 6 and Plot 4, respectively):
+
+```{r, echo=F, warning=F}
+library(plyr)
+counts6 <- count(df=warpeace4, vars=c('agree','pairpeace','guiltb.0'))
+```
+
+Therefore, we are going to apply the surrogate Poisson model to the stimulus factors `agree` and `pairpeace` and the response factor`guiltb`. The minimal model is as follows (for simplicity I will call "partner's choice" simply "pairpeace"):
+
+$$\ln (n_{ijk})=\mu + \mathbf{agree}_i + \mathbf{pairpeace}_j + (\mathbf{agree} \times \mathbf{pairpeace})_{ij} + \mathbf{guiltb}_k$$
+
+The full model takes the form:
+
+$$
+\begin{aligned}
+\ln (n_{ijk}) = & \mu + \mathbf{agree}_i + \mathbf{pairpeace}_j + (\mathbf{agree} \times \mathbf{pairpeace})_{ij} + \mathbf{guiltb}_k \\
+&+ (\mathbf{agree} \times \mathbf{guiltb})_{ik} + (\mathbf{pairpeace} \times \mathbf{guiltb})_{jk} + (\mathbf{agree} \times \mathbf{pairpeace} \times \mathbf{guiltb})_{ijk}
+\end{aligned}
+$$
+
+```{r, echo=FALSE, results='asis', warning=F, message=F}
+
+mydata5 <- cbind(expand.grid(guiltb=c("no","yes"),
+                             pairpeace=c("no","yes"),
+                             agree=c("no","yes")),
+                 ct=c(19,9,8,2,27,15,37,23))
+
+surpois5 <- glm(ct ~ guiltb*pairpeace+guiltb*agree+guiltb*pairpeace*agree, 
+                data=mydata5, 
+                family=poisson)
+
+surpois5.2 <- step(surpois5, data=mydata5, scale=1, trace=F, 
+                   scope=list(lower=ct~pairpeace*agree+guiltb,
+                              upper=formula(surpois5)))
+
+```
+
+The summary of this model can be found in the appendix (Table 7) and from there we can see that a few of the interaction terms are not significant so I will use AIC and stepwise regression in both directions to eliminate the terms that do not add information to the model. The stepwise regression leaves us with the following model:
+
+$$\ln (n_{ijk})=\mu + \mathbf{agree}_i + \mathbf{pairpeace}_j + (\mathbf{agree} \times \mathbf{pairpeace})_{ij} + \mathbf{guiltb}_k$$
+
+This is, of course the minimal model whose summary can also be found in the appendix (Table 8). This tells us that neither mutual agreement nor the selection of the partner affect the feeling of guilt before revelation. It makes sense that there would be no interaction between the selection of a subject's partner and the subject's feeling of guilt before revelation of the selection of the subject's partner because if the subject does not know their partner's selection yet, how could their partner's selection affect their guilt? It is slightly interesting, though, that agreement to peace doesn't interact with guilt before revelation. If a person did not agree to peace with their partner, we might expect that they would feel somewhat guilty.
+
+**The fourth question asks if guilt feelings after revelation depend on mutual agreement and the selection of the partner's choice.**
+
+We can repeat the analysis from the third part of Question 4 using `guilta` instead of `guiltb`. First begin with the frequency table and plot that allows us to look at interactions more clearly (Table 9 and Plot 5 in the Appendix, respectively).
+
+```{r, echo=F, warning=F}
+
+library(plyr)
+counts7 <- count(df=warpeace5, vars=c('agree','pairpeace','guilta.0'))
+
+```
+
+We can now define the minimal model (the same as before, but with $\mathbf{guilta}$ instead of $\mathbf{guiltb}$:
+
+$$\ln (n_{ijk})=\mu + \mathbf{agree}_i + \mathbf{pairpeace}_j + (\mathbf{agree} \times \mathbf{pairpeace})_{ij} + \mathbf{guilta}_k$$
+
+We also have the obvious full model:
+
+$$
+\begin{aligned}
+\ln (n_{ijk}) = & \mu + \mathbf{agree}_i + \mathbf{pairpeace}_j + (\mathbf{agree} \times \mathbf{pairpeace})_{ij} + \mathbf{guilta}_k \\
+&+ (\mathbf{agree} \times \mathbf{guilta})_{ik} + (\mathbf{pairpeace} \times \mathbf{guilta})_{jk} + (\mathbf{agree} \times \mathbf{pairpeace} \times \mathbf{guilta})_{ijk}
+\end{aligned}
+$$
+
+The full model's summary can by found in the appendix (Table 10), but it also includes terms that are not significant. We perform stepwise regression using the AIC criteria on the full model and we get the following model (with summary in Table 11 in the appendix):
+
+$$
+\begin{aligned}
+\ln (n_{ijk}) = & \mu + \mathbf{agree}_i + \mathbf{pairpeace}_j + (\mathbf{agree} \times \mathbf{pairpeace})_{ij} + \mathbf{guilta}_k \\
+&+ (\mathbf{agree} \times \mathbf{guilta})_{ik} + (\mathbf{pairpeace} \times \mathbf{guilta})_{jk}
+\end{aligned}
+$$
+
+```{r, echo=FALSE, results='asis', warning=F, message=F}
+
+mydata6 <- cbind(expand.grid(guilta=c("no","yes"),
+                             pairpeace=c("no","yes"),
+                             agree=c("no","yes")),
+                 ct=c(20,8,5,5,35,7,41,19))
+
+surpois6 <- glm(ct ~ guilta*pairpeace+guilta*agree+guilta*pairpeace*agree, 
+                data=mydata6, 
+                family=poisson)
+
+surpois6.2 <- step(surpois6, data=mydata6, scale=1, trace=F, 
+                   scope=list(lower=ct~pairpeace*agree+guilta,
+                              upper=formula(surpois6)))
+
+```
+
+This is just the full model without the three way interaction. This means that the partner's choice and agreement to peace do not interact together with guilt after revelation; however, both of the stimulus variables interact individually with guilt after revelation. This makes sense intuitively because once your partner's choice is revealed, you might feel more or less guilty based on which option they chose. Also, if you and your partner agreed to something beforehand then your guilt feeling might change once you know what your partner has chosen.
+
+#Conclusions
+
+Based on this anlaysis, the tentative answers to the questions in the introduction are as follows:
+
+1. Agreeing to peace does in fact cause an increase in the chance of choosing peace.
+
+2. Having peace beliefs does increase the chance of actually choosing peace.
+
+3. Agreement to peace and peace beliefs do not interact together with  choosing peace, so together they do not affect the chance of actual selection of peace. we also threw out the interaction between agree and peace. In Question 1 we saw that the interaction between agree and peace was significant; however, when we add the "peaceful" factor and its interactions, "agree" no longer adds information to the model. This also means that peace beliefs is a more important predictor for choosing peace.
+
+4. We saw that far more people who chose peace did not feel guilty, so we can say that choosing war actually does lead to feelings of guilt before revelation of the partner's choice of war or peace. Also, choosing war does lead to guilt feelings. For the third portion of this question, we said that neither mutual agreement nor the partner's selection affect the feeling of guilt before revelation, which makes intuitive sense. Finally, we also said that the partner's choice and agreement to peace do not interact together with guilt after revelation; however, both of the stimulus variables interact individually with guilt after revelation.
+
+\pagebreak
+
+#Appendix
+
+##Plot 1:
+
+```{r, echo=FALSE}
+
+barplot(counts2, 
+        beside=T, 
+        col=c("orange","aquamarine"))
+legend("top",
+       legend=c("did not choose peace","chose peace"), 
+       fill=c("orange","aquamarine"))
+
+```
+
+##Table 1:
+
+```{r,echo=F}
+expcnt2 <- as.table(matrix(c((46+24)*(46+13)/140,(46+13)*(13+57)/140,(46+24)*(24+57)/140,(13+57)*(24+57)/140),nrow=2,ncol=2))
+
+colnames(expcnt2) <- c("non-peace beliefs","peace beliefs")
+rownames(expcnt2) <- c("did not choose peace","chose peace")
+
+#test statistic
+test.stat2 <- (((46-29.5)^2)/29.5) + (((13-29.5)^2)/29.5) + (((24-40.5)^2)/40.5) + (((57-40.5)^2)/40.5)
+
+counts2.5 <- as.table(matrix(c(29.5,29.5,40.5,40.5),nrow=2,ncol=2))
+rownames(counts2.5) <- rownames(counts2)
+colnames(counts2.5) <- colnames(counts2)
+kable(counts2.5,align="c")
+
+```
+
+##Equation 1:
+
+$$X^2=\sum \frac{(\mathbf{observed}-\mathbf{expected})^2}{\mathbf{expected}}=\frac{(46-29.5)^2}{29.5}+\frac{(13-29.5)^2}{29.5}+\frac{(24-40.5)^2}{40.5}+\frac{(57-40.5)^2}{40.5} = 31.90207 $$ 
+
+##Equation 2:
+
+$$\ln (n_{ij})=\mu + \mathbf{peace}_i + \mathbf{peaceful}_j$$
+
+\pagebrak
+
+##Table2:
+
+```{r, echo=FALSE, results='asis', warning=F, message=F}
+
+stargazer(surpois2,
+          header=FALSE, 
+          title="Surrogate Poisson Model (Peace Beliefs vs. Choose Peace)", 
+          dep.var.labels="Counts",
+          covariate.labels=c("peace","peaceful","peace*peaceful","Intercept"),
+          report="vcp*")
+
+```
+
+\pagebreak
+
+##Table 3:
+
+```{r, echo=FALSE, results='asis', warning=F, message=F}
+
+stargazer(surpois3,
+          header=FALSE, 
+          title="Surrogate Poisson Model (Peace Beliefs and Agree to Peace vs. Choose Peace)", 
+          dep.var.labels="Counts",
+          covariate.labels=c("peace","peaceful",
+                             "agree","peaceful*peace",
+                             "agree*peace","peaceful*agree",
+                             "agree*peaceful*peace",
+                             "Intercept"),
+          report="vcp*")
+
+```
+
+\pagebreak
+
+##Table 4:
+
+```{r, echo=FALSE, results='asis', warning=F, message=F}
+
+stargazer(surpois3.2,
+          header=FALSE, 
+          title="Surrogate Poisson Model (Peace Beliefs and Agree to Peace vs. Choose Peace after Model Selection)", 
+          dep.var.labels="Counts",
+          covariate.labels=c("peace","peaceful",
+                             "agree","peaceful*peace",
+                             "peaceful*agree","Intercept"),
+          report="vcp*")
+
+```
+
+\pagebreak
+
+##Plot 2:
+
+```{r,echo=FALSE}
+barplot(counts4, 
+        beside=T, 
+        col=c("orange","aquamarine"),
+        xlab="guilt before revelation")
+
+legend("topleft",
+       legend=c("no guilt feelings","guilt feelings"), 
+       fill=c("orange","aquamarine"))
+```
+
+\pagebreak
+
+##Table 5:
+
+```{r, echo=FALSE, results='asis', warning=F, message=F}
+
+stargazer(surpois4,
+          header=FALSE, 
+          title="Surrogate Poisson Model (Choose Peace vs. Guilt Feelings Before Revelation)", 
+          dep.var.labels="Counts",
+          covariate.labels=c("peace","guiltb",
+                             "peace*guiltb","Intercept"),
+          report="vcp*")
+
+```
+
+\pagebreak
+
+##Plot 3:
+
+```{r,echo=FALSE}
+
+barplot(counts5, 
+        beside=T, 
+        col=c("orange","aquamarine"),
+        xlab="guilt after revelation")
+
+legend("topleft",
+       legend=c("no guilt feelings","guilt feelings"), 
+       fill=c("orange","aquamarine"))
+
+```
+
+\pagebreak
+
+##Table 6:
+
+```{r, echo=F, warning=F}
+
+kable(counts6,col.names=c("agreed to peace","partner agreed to peace","guilt feelings","counts"),align="c")
+
+```
+
+##Plot 4:
+
+```{r, echo=F, warning=F}
+
+x <- cbind(expand.grid(peaceful=c(0,1),agree=c(0,1)),p=c(900/(19+9),200/(8+2),1500/(27+15),2300/(37+23)))
+
+symbols(x[,2],x[,3],
+        circles=c(28,10,42,60)/140,
+        xlim=c(-0.8,1.8),
+        ylim=c(15,50),
+        xlab="agreed to peace",
+        ylab="percent that had guilt feelings",
+        main="Percent that had guilt feelings before revelation",
+        inches=F,
+        axes=F)
+
+box()
+axis(2,cex=0.7)
+axis(1,at=c(0,1),label=c("no","yes"),cex=0.7)
+points(x[x[,1]==0,2],x[x[,1]==0,3],pch="no")
+points(x[x[,1]==1,2],x[x[,1]==1,3],pch="yes")
+lines(c(0,1),100*c((9+2)/(19+9+8+2),(15+23)/(27+15+37+23)),lty=2,pch="M",type="b")
+
+```
+
+\pagebreak
+
+##Table 7:
+
+```{r, echo=FALSE, results='asis', warning=F, message=F}
+
+stargazer(surpois5,
+          header=FALSE, 
+          title="Surrogate Poisson Model (Partner's Choice and Agree to Peace vs. Guilt Before)", 
+          dep.var.labels="Counts",
+          covariate.labels=c("guiltb","pairpeace",
+                             "agree","pairpeace*guiltb",
+                             "agree*guiltb","pairpeace*agree",
+                             "agree*pairpeace*guiltb",
+                             "Intercept"),
+          report="vcp*")
+
+```
+
+\pagebreak
+
+##Table 8:
+
+```{r, echo=FALSE, results='asis', warning=F, message=F}
+
+stargazer(surpois5.2,
+          header=FALSE, 
+          title="Surrogate Poisson Model (Partner's Choice and Agree to Peace vs. Guilt Before) After Stepwise", 
+          dep.var.labels="Counts",
+          covariate.labels=c("guiltb","pairpeace",
+                             "agree","pairpeace*agree",
+                             "Intercept"),
+          report="vcp*")
+
+```
+
+\pagebreak
+
+##Table 9:
+
+```{r, echo=F, warning=F}
+
+kable(counts7,col.names=c("agreed to peace","partner agreed to peace","guilt feelings","counts"),align="c")
+
+```
+
+##Plot 5:
+
+```{r, echo=F, warning=F}
+
+x <- cbind(expand.grid(peaceful=c(0,1),agree=c(0,1)),p=c(800/(20+8),500/(5+5),700/(35+7),1900/(41+19)))
+
+symbols(x[,2],x[,3],
+        circles=c(28,10,42,60)/140,
+        xlim=c(-0.8,1.8),
+        ylim=c(0,55),
+        xlab="agreed to peace",
+        ylab="percent that had guilt feelings",
+        main="Percent that had guilt feelings after revelation",
+        inches=F,
+        axes=F)
+
+box()
+axis(2,cex=0.7)
+axis(1,at=c(0,1),label=c("no","yes"),cex=0.7)
+points(x[x[,1]==0,2],x[x[,1]==0,3],pch="no")
+points(x[x[,1]==1,2],x[x[,1]==1,3],pch="yes")
+lines(c(0,1),100*c((8+5)/(20+8+5+5),(7+19)/(35+7+41+19)),lty=2,pch="M",type="b")
+
+```
+
+\pagebreak
+
+##Table 10:
+
+```{r, echo=FALSE, results='asis', warning=F, message=F}
+
+stargazer(surpois6,
+          header=FALSE, 
+          title="Surrogate Poisson Model (Partner's Choice and Agree to Peace vs. Guilt After)", 
+          dep.var.labels="Counts",
+          covariate.labels=c("guilta","pairpeace",
+                             "agree","pairpeace*guilta",
+                             "agree*guilta","pairpeace*agree",
+                             "agree*pairpeace*guilta",
+                             "Intercept"),
+          report="vcp*")
+
+```
+
+\pagebreak
+
+##Table 11:
+
+```{r, echo=FALSE, results='asis', warning=F, message=F}
+
+stargazer(surpois6.2,
+          header=FALSE, 
+          title="Surrogate Poisson Model (Partner's Choice and Agree to Peace vs. Guilt After) After Stepwise", 
+          dep.var.labels="Counts",
+          covariate.labels=c("guilta","pairpeace",
+                             "agree","pairpeace*guilta",
+                             "agree*guilta","pairpeace*agree",
+                             "Intercept"),
+          report="vcp*")
+
+```
+
